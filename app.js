@@ -2133,13 +2133,6 @@ function clearSampleRecipes() {
   render();
   showToast('已清空 ' + samples.length + ' 个示例配方 ✓');
 }
-  loadSamples();
-  state.currentRecipeId = null;
-  state.currentCat = 'all';
-  saveState();
-  render();
-  showToast('已重置');
-}
 
 // ============ 下拉框刷新 ============
 function refreshCatSelect() {

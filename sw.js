@@ -1,7 +1,7 @@
 /* 烘焙工作台 Service Worker
    - 缓存资源实现离线访问
    - 后台更新（cache-first 策略）*/
-const CACHE_NAME = 'baking-workbench-v10';
+const CACHE_NAME = 'baking-workbench-v11';
 const ASSETS = [
   './',
   './index.html',
