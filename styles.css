@@ -1529,3 +1529,126 @@ body.dark-mode .font-size-btn {
 }
 
 body.dark-mode .recipe-thumb { background: linear-gradient(135deg, #3a2a30, #2a2024); }
+/* ============================================
+   v3.1 新增：智能识别 / AI / 配料编辑
+============================================ */
+
+/* 智能工具条 */
+.smart-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 10px;
+  background: linear-gradient(135deg, #fff0f5, #ffe8ef);
+  border: 1.5px dashed var(--pink-border);
+  border-radius: 12px;
+}
+.smart-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--pink-primary);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--pink-deep);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.smart-btn:hover { background: var(--pink-primary); color: #fff; }
+.smart-btn.ai {
+  background: linear-gradient(135deg, var(--pink-primary), var(--pink-deep));
+  color: #fff;
+  border-color: var(--pink-deep);
+}
+.smart-btn.ai:hover { opacity: 0.9; }
+
+/* 智能识别预览 */
+.smart-preview {
+  margin-top: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.smart-preview .sp-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: var(--pink-light);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.smart-preview .sp-item .sp-name { flex: 1; font-weight: 600; color: var(--text-primary); }
+.smart-preview .sp-item .sp-amt { color: var(--pink-deep); font-weight: 700; }
+.smart-preview .sp-item .sp-del { cursor: pointer; color: #ccc; font-size: 16px; }
+.smart-preview .sp-item .sp-del:hover { color: var(--pink-deep); }
+
+/* AI 信息框 */
+.ai-info-box {
+  padding: 12px;
+  background: linear-gradient(135deg, #f0f5ff, #e8f0fe);
+  border: 1.5px solid #c8d8f8;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+.ai-info-box a { text-decoration: underline; }
+
+/* 配料行操作按钮 */
+.ing-item {
+  position: relative;
+}
+.ing-item .ing-actions {
+  display: none;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  gap: 4px;
+}
+.ing-item:hover .ing-actions { display: flex; }
+.ing-item .ing-actions button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--pink-border);
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.ing-item .ing-actions button:hover { background: var(--pink-light); border-color: var(--pink-primary); }
+.ing-item .ing-actions button.del:hover { background: #ffe0e0; border-color: #e8526a; color: #e8526a; }
+
+/* 配料添加按钮（详情页） */
+.ing-add-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 1.5px dashed var(--pink-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--pink-deep);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ing-add-btn:hover { background: var(--pink-light); border-color: var(--pink-primary); }
+
+/* AI 状态 */
+#aiStatus.loading { color: var(--pink-deep); }
+#aiStatus.error { color: #e8526a; }
+#aiStatus.success { color: #5a8a50; }
+
+/* 暗色模式适配 */
+body.dark-mode .smart-toolbar { background: #2a2024; border-color: var(--pink-border); }
+body.dark-mode .smart-btn { background: #2a2024; color: var(--pink-primary); }
+body.dark-mode .smart-preview .sp-item { background: #332830; }
+body.dark-mode .ai-info-box { background: #2a2230; border-color: #4a3a50; }
+body.dark-mode .ing-item .ing-actions button { background: #332830; }
+body.dark-mode .ing-add-btn { border-color: var(--pink-border); color: var(--pink-primary); }

@@ -606,14 +606,18 @@ function renderDetail(recipe) {
     ? `<div class="detail-photo-section"><img class="detail-photo" src="${recipe.photo}" alt="成品图"></div>`
     : `<div class="detail-photo-section"><div class="detail-photo-empty"><div class="icon">📷</div><div>暂无成品图，点击「编辑」上传</div></div></div>`;
 
-  const ingItems = (recipe.ingredients || []).map(i => {
+  const ingItems = (recipe.ingredients || []).map((i, idx) => {
     const checked = ingChecks[i.name] || false;
     const amt = scale === 1 ? i.amount : formatAmount(i.amount * scale);
     return `
       <div class="ing-item ${checked ? 'checked' : ''}" onclick="toggleIngCheck('${recipe.id}', '${escapeHtml(i.name)}')">
         <span class="ing-check">${checked ? '✓' : ''}</span>
-        <span class="ing-name">${i.name}</span>
+        <span class="ing-name">${escapeHtml(i.name)}</span>
         <span class="ing-amt">${amt}${i.unit || ''}</span>
+        <span class="ing-actions" onclick="event.stopPropagation()">
+          <button onclick="editIngInDetail('${recipe.id}', ${idx})" title="编辑">✏️</button>
+          <button class="del" onclick="delIngInDetail('${recipe.id}', ${idx})" title="删除">🗑️</button>
+        </span>
       </div>`;
   }).join('');
 
@@ -673,10 +677,11 @@ function renderDetail(recipe) {
       <div class="ingredients-section">
         <div class="section-title">
           <span class="sec-icon">🧾</span>配料
-          <span class="recheck-hint">点亮 ✓ 可单独勾该项</span>
+          <span class="recheck-hint">点亮 ✓ 可单独勾该项 · 悬停显示编辑/删除</span>
           <button class="copy-btn" onclick="copyIngredients('${recipe.id}')">📋 复制</button>
         </div>
         <div class="ing-grid">${ingItems}</div>
+        <button class="ing-add-btn" onclick="addIngInDetail('${recipe.id}')">+ 添加配料</button>
       </div>
 
       <div class="steps-section">
@@ -719,6 +724,65 @@ function toggleFavorite(id) {
   }
   saveState();
   renderDetail(state.recipes.find(r => r.id === id));
+}
+
+// ============ 详情页配料行：编辑/删除/添加 ============
+let ingEditContext = { recipeId: null, idx: -1, isNew: false };
+
+function editIngInDetail(recipeId, idx) {
+  const r = state.recipes.find(x => x.id === recipeId);
+  if (!r || !r.ingredients[idx]) return;
+  const ing = r.ingredients[idx];
+  ingEditContext = { recipeId, idx, isNew: false };
+  document.getElementById('ingEditTitle').textContent = '编辑配料';
+  document.getElementById('ie-name').value = ing.name || '';
+  document.getElementById('ie-amount').value = (ing.amount || '') + (ing.unit || '');
+  document.getElementById('ie-cost').value = ing.cost || '';
+  document.getElementById('ingEditModal').classList.add('show');
+}
+
+function addIngInDetail(recipeId) {
+  ingEditContext = { recipeId, idx: -1, isNew: true };
+  document.getElementById('ingEditTitle').textContent = '添加配料';
+  document.getElementById('ie-name').value = '';
+  document.getElementById('ie-amount').value = '';
+  document.getElementById('ie-cost').value = '';
+  document.getElementById('ingEditModal').classList.add('show');
+}
+
+function saveIngEdit() {
+  const name = document.getElementById('ie-name').value.trim();
+  if (!name) { showToast('请填写名称'); return; }
+  const amountRaw = document.getElementById('ie-amount').value.trim();
+  const m = amountRaw.match(/^(\d+(?:\.\d+)?)\s*(g|克|ml|个|滴|片|勺|包|克)?/);
+  const amount = m ? parseFloat(m[1]) : 0;
+  const unit = m && m[2] ? m[2] : 'g';
+  const cost = parseFloat(document.getElementById('ie-cost').value) || 0;
+
+  const r = state.recipes.find(x => x.id === ingEditContext.recipeId);
+  if (!r) return;
+  if (!r.ingredients) r.ingredients = [];
+
+  if (ingEditContext.isNew) {
+    r.ingredients.push({ name, amount, unit, cost });
+    showToast('已添加配料 ✓');
+  } else {
+    r.ingredients[ingEditContext.idx] = { name, amount, unit, cost };
+    showToast('已更新配料 ✓');
+  }
+  saveState();
+  closeModal('ingEditModal');
+  if (state.currentRecipeId === r.id) renderDetail(r);
+}
+
+function delIngInDetail(recipeId, idx) {
+  const r = state.recipes.find(x => x.id === recipeId);
+  if (!r || !r.ingredients[idx]) return;
+  if (!confirm('删除该项配料？')) return;
+  r.ingredients.splice(idx, 1);
+  saveState();
+  showToast('已删除');
+  if (state.currentRecipeId === r.id) renderDetail(r);
 }
 
 function selectRecipe(id) {
@@ -810,6 +874,187 @@ function delIngRow(idx) {
   state.tempIngredients.splice(idx, 1);
   if (state.tempIngredients.length === 0) addIngRow();
   renderIngRows();
+}
+
+// ============ 智能识别：粘贴文字自动拆分配料/步骤 ============
+let smartPasteTarget = 'ingredients'; // 'ingredients' | 'steps'
+let smartPasteResult = []; // 解析结果暂存
+
+function openSmartPasteModal(target) {
+  smartPasteTarget = target;
+  smartPasteResult = [];
+  const titleEl = document.getElementById('smartPasteTitle');
+  const hintEl = document.getElementById('smartPasteHint');
+  const textEl = document.getElementById('smartPasteText');
+  const previewEl = document.getElementById('smartPastePreview');
+
+  if (target === 'ingredients') {
+    titleEl.textContent = '📋 智能识别配料';
+    hintEl.innerHTML = '粘贴配料表文字，自动按「名称 + 数字 + 单位」拆分。<br>支持格式：<code>高筋面粉 250g</code> / <code>牛奶120克</code> / <code>黄油 25 g</code>';
+    textEl.placeholder = '在这里粘贴配料表...\n\n示例：\n高筋面粉 250g\n牛奶 120g\n黄油 25g\n酵母 3g\n盐 3g';
+  } else {
+    titleEl.textContent = '📋 智能识别步骤';
+    hintEl.innerHTML = '粘贴步骤文字，自动按行号/序号拆分。<br>支持「1.」「步骤一」「第一步」等格式';
+    textEl.placeholder = '在这里粘贴步骤文字...\n\n示例：\n1. 所有材料入揉面桶搅拌成团\n2. 加入黄油揉至扩展阶段\n3. 发酵60分钟至2倍大';
+  }
+  textEl.value = '';
+  previewEl.innerHTML = '';
+  textEl.oninput = () => parseSmartPaste(textEl.value);
+  document.getElementById('smartPasteModal').classList.add('show');
+}
+
+function parseSmartPaste(text) {
+  const previewEl = document.getElementById('smartPastePreview');
+  if (!text.trim()) { smartPasteResult = []; previewEl.innerHTML = ''; return; }
+
+  if (smartPasteTarget === 'ingredients') {
+    smartPasteResult = parseIngredients(text);
+    previewEl.innerHTML = smartPasteResult.map((item, idx) => `
+      <div class="sp-item">
+        <span class="sp-name">${escapeHtml(item.name)}</span>
+        <span class="sp-amt">${item.amount}${item.unit}</span>
+        <span class="sp-del" onclick="removeSmartItem(${idx})">×</span>
+      </div>
+    `).join('') || '<div style="font-size:12px;color:var(--text-muted);padding:8px">未识别到配料，请检查格式</div>';
+  } else {
+    smartPasteResult = parseSteps(text);
+    previewEl.innerHTML = smartPasteResult.map((step, idx) => `
+      <div class="sp-item">
+        <span class="sp-name" style="font-weight:400;font-size:12.5px">${idx + 1}. ${escapeHtml(step)}</span>
+        <span class="sp-del" onclick="removeSmartItem(${idx})">×</span>
+      </div>
+    `).join('') || '<div style="font-size:12px;color:var(--text-muted);padding:8px">未识别到步骤</div>';
+  }
+}
+
+function removeSmartItem(idx) {
+  smartPasteResult.splice(idx, 1);
+  // 重新渲染预览
+  const previewEl = document.getElementById('smartPastePreview');
+  if (smartPasteTarget === 'ingredients') {
+    previewEl.innerHTML = smartPasteResult.map((item, i) => `
+      <div class="sp-item">
+        <span class="sp-name">${escapeHtml(item.name)}</span>
+        <span class="sp-amt">${item.amount}${item.unit}</span>
+        <span class="sp-del" onclick="removeSmartItem(${i})">×</span>
+      </div>
+    `).join('');
+  } else {
+    previewEl.innerHTML = smartPasteResult.map((step, i) => `
+      <div class="sp-item">
+        <span class="sp-name" style="font-weight:400;font-size:12.5px">${i + 1}. ${escapeHtml(step)}</span>
+        <span class="sp-del" onclick="removeSmartItem(${i})">×</span>
+      </div>
+    `).join('');
+  }
+}
+
+// 解析配料文字 → [{name, amount, unit}]
+function parseIngredients(text) {
+  const lines = text.split(/[\n\r;；]+/).map(l => l.trim()).filter(Boolean);
+  const result = [];
+  // 用单个正则按行解析，捕获组：name | amount | unit
+  // 支持：高筋面粉 250g / 牛奶 120克 / 250g 高筋面粉 / 黄油25g / 盐 适量
+  const re = /^(.+?)\s*[:：]?\s*(\d+(?:\.\d+)?)\s*(g|克|ml|毫升|L|升|个|只|滴|片|勺|汤匙|茶匙|包|袋|颗|根|适量|少许)?\s*$/;
+
+  for (let line of lines) {
+    // 去掉前导符号 "•"、"- "、"1." 等
+    line = line.replace(/^[\s•·\-\*]+/, '').replace(/^\d+[.、)]\s*/, '');
+
+    // 模式 A：名称在前 "高筋面粉 250g" / "牛奶120克" / "黄油 25 g"
+    let m = line.match(re);
+    if (m) {
+      result.push({
+        name: m[1].trim(),
+        amount: parseFloat(m[2]) || 0,
+        unit: m[3] || 'g'
+      });
+      continue;
+    }
+
+    // 模式 B：数字在前 "250g 高筋面粉"
+    const reNumFirst = /^(\d+(?:\.\d+)?)\s*(g|克|ml|毫升|L|升|个|只|滴|片|勺|汤匙|茶匙|包|袋|颗|根|适量|少许)?\s*(.+)$/;
+    m = line.match(reNumFirst);
+    if (m && m[3] && m[3].trim()) {
+      result.push({
+        name: m[3].trim(),
+        amount: parseFloat(m[1]) || 0,
+        unit: m[2] || 'g'
+      });
+      continue;
+    }
+
+    // 模式 C：只有名称无数字（如"盐 适量" / "葱 少许"）
+    const m2 = line.match(/^(.+?)\s*(适量|少许|少量)$/);
+    if (m2) {
+      result.push({ name: m2[1].trim(), amount: 0, unit: m2[2] });
+      continue;
+    }
+
+    // 模式 D：名称 + 数字 紧贴（无空格）"面粉250g"
+    const m3 = line.match(/^(.+?)(\d+(?:\.\d+)?)\s*(g|克|ml|毫升|L|升|个|只|滴|片|勺|汤匙|茶匙|包|袋|颗|根|适量|少许)?$/);
+    if (m3 && m3[1].trim()) {
+      result.push({
+        name: m3[1].trim(),
+        amount: parseFloat(m3[2]) || 0,
+        unit: m3[3] || 'g'
+      });
+      continue;
+    }
+
+    // 兜底：整行作为名称
+    if (line.length > 0 && line.length < 30) {
+      result.push({ name: line, amount: 0, unit: 'g' });
+    }
+  }
+  return result;
+}
+
+// 解析步骤文字 → [string]
+function parseSteps(text) {
+  const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
+  return lines.map(line => {
+    // 去掉前导序号 "1." "1、" "第一步" "步骤一"
+    return line
+      .replace(/^(?:第[一二三四五六七八九十\d]+[步阶段]?)\s*[:：]?\s*/, '')
+      .replace(/^(?:步骤\s*\d+)\s*[:：]?\s*/, '')
+      .replace(/^\d+\s*[.、)]\s*/, '')
+      .replace(/^[\s•·\-\*]+\s*/, '')
+      .trim();
+  }).filter(Boolean);
+}
+
+function applySmartPaste() {
+  if (smartPasteResult.length === 0) {
+    // 尝试从文本框再解析一次
+    parseSmartPaste(document.getElementById('smartPasteText').value);
+  }
+  if (smartPasteResult.length === 0) {
+    showToast('未识别到内容');
+    return;
+  }
+
+  if (smartPasteTarget === 'ingredients') {
+    // 合并到 tempIngredients
+    smartPasteResult.forEach(item => {
+      state.tempIngredients.push({
+        name: item.name,
+        amount: item.amount,
+        unit: item.unit,
+        cost: 0
+      });
+    });
+    renderIngRows();
+    showToast(`已识别 ${smartPasteResult.length} 项配料 ✓`);
+  } else {
+    // 追加到步骤文本框
+    const ta = document.getElementById('f-steps');
+    const existing = ta.value.trim();
+    const newSteps = smartPasteResult.join('\n');
+    ta.value = existing ? (existing + '\n' + newSteps) : newSteps;
+    showToast(`已识别 ${smartPasteResult.length} 条步骤 ✓`);
+  }
+  closeModal('smartPasteModal');
 }
 
 // ============ 模态框：新增/编辑配方 ============
@@ -909,6 +1154,7 @@ function saveRecipe() {
     showToast('配方已保存 ✓');
   }
 
+  const wasNew = !state.editingId;
   state.editingId = null;
   state.tempPhoto = '';
   state.tempRating = 0;
@@ -916,7 +1162,7 @@ function saveRecipe() {
   saveState();
   closeModal('recipeModal');
   render();
-  if (state.editingId === null) {
+  if (wasNew) {
     // 新建后跳到详情
     const last = state.recipes[state.recipes.length - 1];
     selectRecipe(last.id);
@@ -1377,6 +1623,197 @@ function showToast(msg) {
   toast.classList.add('show');
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ============ AI 生成配方（通义千问 VL） ============
+const AI_KEY_STORAGE = 'baking_ai_apikey';
+let aiTempPhoto = ''; // base64 图片
+
+function loadAIKey() {
+  return localStorage.getItem(AI_KEY_STORAGE) || '';
+}
+
+function saveAIKey() {
+  const key = document.getElementById('aiApiKey').value.trim();
+  if (!key) { showToast('请输入 Key'); return; }
+  localStorage.setItem(AI_KEY_STORAGE, key);
+  showToast('API Key 已保存（仅本地）✓');
+}
+
+function openAIGenModal() {
+  document.getElementById('aiApiKey').value = loadAIKey();
+  document.getElementById('aiText').value = '';
+  document.getElementById('aiStatus').textContent = '';
+  document.getElementById('aiStatus').className = '';
+  aiTempPhoto = '';
+  const preview = document.getElementById('aiPhotoPreview');
+  preview.style.backgroundImage = '';
+  preview.classList.remove('has-image');
+  preview.innerHTML = '<span class="upload-hint">点击上传图片<br>（视频关键画面截图）</span>';
+  document.getElementById('aiGenModal').classList.add('show');
+}
+
+function handleAIPhotoUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 4 * 1024 * 1024) { showToast('图片过大，请压缩到 4MB 以内'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    aiTempPhoto = e.target.result;
+    const preview = document.getElementById('aiPhotoPreview');
+    preview.style.backgroundImage = `url('${aiTempPhoto}')`;
+    preview.classList.add('has-image');
+    preview.innerHTML = '<span class="remove-photo" onclick="event.stopPropagation();clearAIPhoto()">×</span>';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearAIPhoto() {
+  aiTempPhoto = '';
+  const preview = document.getElementById('aiPhotoPreview');
+  preview.style.backgroundImage = '';
+  preview.classList.remove('has-image');
+  preview.innerHTML = '<span class="upload-hint">点击上传图片<br>（视频关键画面截图）</span>';
+  document.getElementById('ai-photo').value = '';
+}
+
+async function generateRecipeByAI() {
+  const apiKey = loadAIKey() || document.getElementById('aiApiKey').value.trim();
+  if (!apiKey) {
+    showToast('请先填入通义千问 API Key');
+    return;
+  }
+
+  const text = document.getElementById('aiText').value.trim();
+  if (!aiTempPhoto && !text) {
+    showToast('请上传图片或粘贴文字');
+    return;
+  }
+
+  const statusEl = document.getElementById('aiStatus');
+  const btn = document.getElementById('aiGenBtn');
+  statusEl.className = 'loading';
+  statusEl.textContent = '🤖 AI 思考中，请稍等 10-30 秒...';
+  btn.disabled = true;
+  btn.textContent = '生成中...';
+
+  try {
+    // 构造 prompt
+    const prompt = `你是一个专业烘焙配方整理助手。请根据${aiTempPhoto ? '上传的图片' : '提供的文字'}，整理出一个完整的烘焙配方。
+
+要求：
+1. 仔细识别图片中的配料表、用量、制作步骤
+2. 如果是视频截图，识别画面中的文字信息
+3. 按以下 JSON 格式输出（只输出 JSON，不要其他文字）：
+{
+  "name": "配方名称",
+  "cat": "分类(bread/cake/cookie/pastry/cn/filled 之一)",
+  "temp": "温度如 上火180/下火160",
+  "duration": "时间如 25分钟",
+  "outputQty": 1,
+  "outputUnit": "个",
+  "ingredients": [{"name":"配料名","amount":250,"unit":"g","cost":0}],
+  "steps": ["步骤1","步骤2"],
+  "ovenTip": "森歌D5ZK平炉适配提示（原配方上下火取中位温度，平炉无法独立调上下火）",
+  "difficulty": ["难点1","难点2"],
+  "tags": ["标签1","标签2"]
+}
+
+${text ? '\n用户补充说明：' + text : ''}
+注意：cost 字段如果不清楚就填 0。amount 必须是数字。`;
+
+    // 构造消息内容
+    const content = [];
+    if (aiTempPhoto) {
+      // 提取 base64 纯数据（去掉 data:image/xxx;base64, 前缀）
+      const base64Data = aiTempPhoto.split(',')[1];
+      const mimeType = aiTempPhoto.match(/data:(image\/\w+);/)[1] || 'image/jpeg';
+      content.push({
+        type: 'image_url',
+        image_url: { url: `data:${mimeType};base64,${base64Data}` }
+      });
+    }
+    content.push({ type: 'text', text: prompt });
+
+    // 调用通义千问 VL API（兼容 OpenAI 格式）
+    const resp = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'qwen-vl-max',
+        messages: [{ role: 'user', content: content }],
+        temperature: 0.3
+      })
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`API ${resp.status}: ${errText.substring(0, 200)}`);
+    }
+
+    const data = await resp.json();
+    const aiText = data.choices[0].message.content;
+
+    // 提取 JSON
+    const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('AI 返回格式异常');
+    const recipe = JSON.parse(jsonMatch[0]);
+
+    // 填入表单
+    fillRecipeFormFromAI(recipe);
+
+    statusEl.className = 'success';
+    statusEl.textContent = '✓ 配方已生成，请检查后保存';
+    showToast('AI 生成完成 ✓');
+    setTimeout(() => closeModal('aiGenModal'), 1500);
+
+  } catch (err) {
+    statusEl.className = 'error';
+    let msg = err.message;
+    if (msg.includes('401')) msg = 'API Key 无效，请检查';
+    else if (msg.includes('429')) msg = '调用频率超限，请稍后再试';
+    else if (msg.includes('insufficient')) msg = '余额不足，请充值或领取免费额度';
+    statusEl.textContent = '❌ ' + msg;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🤖 生成配方';
+  }
+}
+
+function fillRecipeFormFromAI(recipe) {
+  // 确保模态框已打开
+  if (!document.getElementById('recipeModal').classList.contains('show')) {
+    openRecipeModal();
+  }
+
+  document.getElementById('f-name').value = recipe.name || 'AI 生成配方';
+  const catSelect = document.getElementById('f-cat');
+  if (recipe.cat && catSelect) {
+    for (let opt of catSelect.options) {
+      if (opt.value === recipe.cat) { catSelect.value = recipe.cat; break; }
+    }
+  }
+  document.getElementById('f-temp').value = recipe.temp || '';
+  document.getElementById('f-duration').value = recipe.duration || '';
+  document.getElementById('f-outputQty').value = recipe.outputQty || 1;
+  document.getElementById('f-outputUnit').value = recipe.outputUnit || '';
+  document.getElementById('f-steps').value = (recipe.steps || []).join('\n');
+  document.getElementById('f-oven').value = recipe.ovenTip || '';
+  document.getElementById('f-difficulty').value = (recipe.difficulty || []).join('\n');
+  document.getElementById('f-tags').value = (recipe.tags || []).join(', ');
+
+  // 填入配料
+  state.tempIngredients = (recipe.ingredients || []).map(i => ({
+    name: i.name || '',
+    amount: parseFloat(i.amount) || 0,
+    unit: i.unit || 'g',
+    cost: parseFloat(i.cost) || 0
+  }));
+  if (state.tempIngredients.length === 0) addIngRow();
+  else renderIngRows();
 }
 
 // ============ 启动 ============
