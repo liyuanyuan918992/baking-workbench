@@ -882,11 +882,11 @@ function delIngRow(idx) {
   renderIngRows();
 }
 
-// ============ 智能识别：粘贴文字自动拆分配料+步骤+注意事项 ============
-let smartPasteResult = { ingredients: [], steps: [], notes: [] };
+// ============ 智能识别：粘贴文字自动拆分配料+步骤+注意事项+温度/时间/份量 ============
+let smartPasteResult = { ingredients: [], steps: [], notes: [], temp: '', duration: '', outputQty: '', outputUnit: '' };
 
 function openSmartPasteModal() {
-  smartPasteResult = { ingredients: [], steps: [], notes: [] };
+  smartPasteResult = { ingredients: [], steps: [], notes: [], temp: '', duration: '', outputQty: '', outputUnit: '' };
   document.getElementById('smartPasteText').value = '';
   document.getElementById('smartPastePreview').innerHTML = '';
   document.getElementById('smartPasteText').oninput = function() {
@@ -899,16 +899,23 @@ function openSmartPasteModal() {
 function parseSmartPaste(text) {
   const previewEl = document.getElementById('smartPastePreview');
   if (!text.trim()) {
-    smartPasteResult = { ingredients: [], steps: [], notes: [] };
+    smartPasteResult = { ingredients: [], steps: [], notes: [], temp: '', duration: '', outputQty: '', outputUnit: '' };
     previewEl.innerHTML = '';
     return;
   }
 
   const segments = segmentText(text);
+  // 从全文提取温度/时间/份量
+  var meta = parseMeta(text);
+
   smartPasteResult = {
     ingredients: parseIngredients(segments.ingredients.join('\n')),
     steps: parseSteps(segments.steps.join('\n')),
-    notes: parseNotes(segments.notes.join('\n'))
+    notes: parseNotes(segments.notes.join('\n')),
+    temp: meta.temp,
+    duration: meta.duration,
+    outputQty: meta.outputQty,
+    outputUnit: meta.outputUnit
   };
 
   renderSmartPreview();
@@ -917,6 +924,19 @@ function parseSmartPaste(text) {
 function renderSmartPreview() {
   const previewEl = document.getElementById('smartPastePreview');
   let html = '';
+
+  // 温度/时间/份量 卡片
+  var metaParts = [];
+  if (smartPasteResult.temp) metaParts.push('温度 ' + escapeHtml(smartPasteResult.temp));
+  if (smartPasteResult.duration) metaParts.push('时间 ' + escapeHtml(smartPasteResult.duration));
+  if (smartPasteResult.outputQty || smartPasteResult.outputUnit) {
+    metaParts.push('份量 ' + (smartPasteResult.outputQty || '') + (smartPasteResult.outputUnit || ''));
+  }
+  if (metaParts.length > 0) {
+    html += '<div class="sp-section"><div class="sp-section-title">🔥 烘焙参数</div>';
+    html += '<div class="sp-item sp-meta-item"><span class="sp-name" style="font-weight:400">' + metaParts.join(' · ') + '</span></div>';
+    html += '</div>';
+  }
 
   if (smartPasteResult.ingredients.length > 0) {
     html += '<div class="sp-section"><div class="sp-section-title">🧾 配料（' + smartPasteResult.ingredients.length + '）</div>';
@@ -1097,14 +1117,109 @@ function parseNotes(text) {
   return result;
 }
 
+// ============ 从全文提取温度/时间/份量/模具 ============
+function parseMeta(text) {
+  var meta = { temp: '', duration: '', outputQty: '', outputUnit: '' };
+
+  // 1. 温度提取
+  // 匹配：上下火165℃ / 上火180/下火160 / 165℃ / 180度
+  var tempM = text.match(/上下火\s*(\d{2,3})\s*[℃度]/);
+  if (!tempM) tempM = text.match(/上火\s*(\d{2,3})\s*[\/／]?\s*下火\s*(\d{2,3})\s*[℃度]?/);
+  if (!tempM) tempM = text.match(/(\d{2,3})\s*℃/);
+  if (!tempM) tempM = text.match(/(\d{2,3})\s*度/);
+  if (tempM) {
+    if (tempM[2]) {
+      meta.temp = '上火' + tempM[1] + '/下火' + tempM[2];
+    } else {
+      meta.temp = tempM[0].replace(/\s+/g, '');
+    }
+  }
+
+  // 2. 时间提取（烘烤时间，不取冷冻/发酵时间）
+  // 优先级 1：全程烘烤XX分钟 / 烘烤XX分钟 / 烘焙XX分钟
+  var durM = text.match(/(?:全程|全程烘烤|烘烤时间|烘烤|烘焙时间|烘焙)\s*(\d{1,3})\s*[-~至]\s*(\d{1,3})\s*分钟/);
+  if (!durM) durM = text.match(/(?:全程|全程烘烤|烘烤时间|烘烤|烘焙时间|烘焙)\s*(\d{1,3})\s*分钟/);
+  // 优先级 2：烤XX分钟（不包含冷冻/冷藏/发酵前缀）
+  if (!durM) {
+    var candidates = text.match(/(?:烤|烘烤|烘焙)\s*(\d{1,3})\s*分钟/g) || [];
+    // 单独找一次"烤XX分钟"
+    var m = text.match(/(?:烤|烘烤|烘焙)\s*(\d{1,3})\s*分钟/);
+    if (m) {
+      durM = m;
+    }
+  }
+  // 优先级 3：在"步骤"段中找 "烘烤45分钟"
+  if (!durM) {
+    // 直接匹配"XX分钟"但排除前面有"冷冻/冷藏/发酵/静置/松弛/醒发"的
+    var allMs = text.match(/(\d{1,3})\s*[-~至]\s*(\d{1,3})\s*分钟|\d{1,3}\s*分钟/g) || [];
+    // 过滤：前后不能是冷冻/发酵
+    for (var i = 0; i < allMs.length; i++) {
+      var idx = text.indexOf(allMs[i]);
+      var before = text.substring(Math.max(0, idx - 6), idx);
+      if (!/(冷冻|冷藏|发酵|静置|松弛|醒发|腌制|浸泡)/.test(before)) {
+        var dm = allMs[i].match(/(\d{1,3})\s*[-~至]\s*(\d{1,3})\s*分钟/);
+        if (!dm) dm = allMs[i].match(/(\d{1,3})\s*分钟/);
+        if (dm) { durM = dm; break; }
+      }
+    }
+  }
+  if (durM) {
+    if (durM[2]) {
+      meta.duration = durM[1] + '-' + durM[2] + '分钟';
+    } else {
+      meta.duration = durM[1] + '分钟';
+    }
+  }
+
+  // 3. 模具/份量提取
+  // 匹配：6寸 / 8寸 / 6寸模具 / 450g吐司模 / 2个 / 1条
+  var sizeM = text.match(/(\d+)\s*寸(?:模具)?/);
+  if (sizeM) {
+    meta.outputQty = sizeM[1];
+    meta.outputUnit = '寸';
+  } else {
+    // 尝试匹配 450g 吐司模 / X个 / X条 等
+    var qtyM = text.match(/(\d+)\s*(个|条|份|盒|块|盘)/);
+    if (qtyM) {
+      meta.outputQty = qtyM[1];
+      meta.outputUnit = qtyM[2];
+    }
+  }
+
+  return meta;
+}
+
 // ============ 应用识别结果到表单 ============
 function applySmartPaste() {
   // 如果预览为空，再解析一次
-  if (smartPasteResult.ingredients.length === 0 && smartPasteResult.steps.length === 0 && smartPasteResult.notes.length === 0) {
+  if (smartPasteResult.ingredients.length === 0 && smartPasteResult.steps.length === 0 && smartPasteResult.notes.length === 0 && !smartPasteResult.temp) {
     parseSmartPaste(document.getElementById('smartPasteText').value);
   }
 
   var msgParts = [];
+
+  // 温度
+  if (smartPasteResult.temp) {
+    var tempInput = document.getElementById('f-temp');
+    if (!tempInput.value.trim()) tempInput.value = smartPasteResult.temp;
+    msgParts.push('温度');
+  }
+
+  // 时间
+  if (smartPasteResult.duration) {
+    var durInput = document.getElementById('f-duration');
+    if (!durInput.value.trim()) durInput.value = smartPasteResult.duration;
+    msgParts.push('时间');
+  }
+
+  // 份量
+  if (smartPasteResult.outputQty || smartPasteResult.outputUnit) {
+    var qtyInput = document.getElementById('f-outputQty');
+    var unitInput = document.getElementById('f-outputUnit');
+    if (!qtyInput.value.trim()) qtyInput.value = smartPasteResult.outputQty || '';
+    if (!unitInput.value.trim()) unitInput.value = smartPasteResult.outputUnit || '';
+    msgParts.push('份量');
+  }
 
   // 配料
   if (smartPasteResult.ingredients.length > 0) {
