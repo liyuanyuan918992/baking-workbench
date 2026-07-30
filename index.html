@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ff7a8f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="烘焙工作台">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>烘焙工作台</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ============ 顶部栏 ============ -->
+  <header class="topbar">
+    <div class="logo">
+      <span class="icon">🍰</span>
+      <span>烘焙工作台</span>
+    </div>
+    <div class="subtitle">配方 · 步骤 · 成本 · 计时</div>
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="搜索配方 / 食材 / 步骤...">
+    </div>
+    <div class="actions">
+      <button class="tb-btn primary" onclick="openRecipeModal()">+ 新建</button>
+      <button class="tb-btn ghost-text" onclick="openFavoriteModal()">⭐ 收藏</button>
+      <button class="tb-btn ghost-text" onclick="openPurchaseModal()">🛒 采购</button>
+      <button class="tb-btn ghost-text" onclick="openStockModal()">📦 库存</button>
+      <button class="tb-btn ghost-text" onclick="exportData()">💾 备份</button>
+      <button class="font-size-btn" onclick="changeFontSize(-1)">A-</button>
+      <button class="font-size-btn" onclick="changeFontSize(1)">A+</button>
+      <button class="tb-btn icon-only" onclick="toggleDarkMode()" title="夜间模式">🌙</button>
+    </div>
+  </header>
+
+  <!-- ============ 移动端 Tab 栏 ============ -->
+  <nav class="mobile-tabs" id="mobileTabs">
+    <button class="m-tab active" data-tab="recipe" onclick="switchMobileTab('recipe')">
+      <span class="m-icon">📖</span><span>配方</span>
+    </button>
+    <button class="m-tab" data-tab="plan" onclick="switchMobileTab('plan')">
+      <span class="m-icon">📅</span><span>计划</span>
+    </button>
+    <button class="m-tab" data-tab="memo" onclick="switchMobileTab('memo')">
+      <span class="m-icon">💡</span><span>心得</span>
+    </button>
+  </nav>
+
+  <!-- ============ 主体两栏 ============ -->
+  <div class="main">
+
+    <!-- 左栏：分类 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">分类</div>
+        <ul class="category-list" id="categoryList"></ul>
+        <div class="cat-add-row">
+          <input type="text" id="newCatName" placeholder="新分类名" maxlength="8">
+          <button onclick="addCustomCategory()">+</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">标签筛选</div>
+        <div class="tag-cloud" id="tagCloud"></div>
+      </div>
+
+      <div class="data-section">
+        <div class="sidebar-title">数据管理</div>
+        <button class="data-btn" onclick="document.getElementById('importFile').click()">📥 导入备份</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        <button class="data-btn danger" onclick="resetData()">🗑️ 重置全部</button>
+      </div>
+
+      <div class="sidebar-footer">
+        内置 <span id="footerCount">0</span> · 自定义 <span id="footerCustom">0</span>
+      </div>
+    </aside>
+
+    <!-- 中栏：配方 -->
+    <main class="content" id="content"></main>
+
+  </div>
+
+  <!-- 计时器悬浮按钮 -->
+  <button class="timer-fab" onclick="openTimerModal()">⏱️ 计时</button>
+</div>
+
+<!-- ============ 新增/编辑配方模态框 ============ -->
+<div class="modal-overlay" id="recipeModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="recipeModalTitle">新建配方</h3>
+      <button class="modal-close" onclick="closeModal('recipeModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>分类</label>
+        <select id="f-cat"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>名称</label>
+          <input type="text" id="f-name" placeholder="如：抹茶戚风">
+        </div>
+        <div class="form-group">
+          <label>星级难度</label>
+          <div class="star-rating" id="f-stars">
+            <span class="star" data-v="1">★</span>
+            <span class="star" data-v="2">★</span>
+            <span class="star" data-v="3">★</span>
+            <span class="star" data-v="4">★</span>
+            <span class="star" data-v="5">★</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>温度</label>
+          <input type="text" id="f-temp" placeholder="如：上火180/下火160">
+        </div>
+        <div class="form-group">
+          <label>时间</label>
+          <input type="text" id="f-duration" placeholder="如：18分钟">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>产出数量 <span class="label-hint">（用于成本/单价）</span></label>
+          <input type="number" id="f-outputQty" placeholder="0" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label>产出单位</label>
+          <input type="text" id="f-outputUnit" placeholder="个 / 份 / 盒">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>成品图（手机可拍照上传）</label>
+        <div class="upload-area">
+          <div class="upload-preview" id="photoPreview" onclick="document.getElementById('f-photo').click()">
+            <span class="upload-hint">点击<br>上传图片</span>
+            <span class="remove-photo" onclick="event.stopPropagation();clearPhoto()">×</span>
+          </div>
+          <input type="file" id="f-photo" accept="image/*" onchange="handlePhotoUpload(event)">
+          <div class="upload-btn-text">支持拍照或相册选择<br>图片随配方永久保存在本地</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>配料 <span class="label-hint">（名称 · 用量 · 该用量成本元）</span></label>
+        <div class="ing-rows" id="ingRows"></div>
+        <button class="add-row-btn" onclick="addIngRow()">+ 添加一行配料</button>
+      </div>
+      <div class="form-group">
+        <label>步骤 <span class="label-hint">（每行一条）</span></label>
+        <textarea id="f-steps" rows="4" placeholder="如：&#10;将黄油室温软化至顺滑&#10;分次加入鸡蛋搅打均匀&#10;筛入面粉翻拌至无干粉"></textarea>
+      </div>
+      <div class="form-group">
+        <label>森歌D5ZK 适配提示（平炉上下火联动）</label>
+        <textarea id="f-oven" rows="2" placeholder="如：原配方上火180/下火160，平炉取170℃，底层加烤盘隔热防糊底"></textarea>
+      </div>
+      <div class="form-group">
+        <label>制作难点 / 心得</label>
+        <textarea id="f-difficulty" rows="3" placeholder="如：蛋白打发至湿性偏干，切勿打过头"></textarea>
+      </div>
+      <div class="form-group">
+        <label>标签（逗号分隔）</label>
+        <input type="text" id="f-tags" placeholder="如：低糖, 无水, 开酥, 蒸制">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('recipeModal')">取消</button>
+      <button class="btn-save" onclick="saveRecipe()" id="recipeSaveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 采购清单模态框 ============ -->
+<div class="modal-overlay" id="purchaseModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <h3>🛒 采购清单</h3>
+      <button class="modal-close" onclick="closeModal('purchaseModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>选择配方（按住 Ctrl/Cmd 多选，自动合并同类原料）</label>
+        <select id="p-recipes" multiple style="height:120px"></select>
+      </div>
+      <div class="purchase-list" id="purchaseList">
+        <div style="text-align:center;color:var(--text-muted);font-size:13px;padding:30px 0">选择配方后生成采购清单</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('purchaseModal')">关闭</button>
+      <button class="btn-save" onclick="copyPurchaseList()">复制清单</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 库存模态框 ============ -->
+<div class="modal-overlay" id="stockModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <h3>📦 库存余量</h3>
+      <button class="modal-close" onclick="closeModal('stockModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">录入你已有的原料余量，采购清单会自动扣除库存。</p>
+      <div id="stockList" class="purchase-list"></div>
+      <button class="add-row-btn" onclick="addStockRow()">+ 添加原料</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('stockModal')">关闭</button>
+      <button class="btn-save" onclick="saveStock()">保存库存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 收藏模态框 ============ -->
+<div class="modal-overlay" id="favoriteModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <h3>⭐ 我的收藏</h3>
+      <button class="modal-close" onclick="closeModal('favoriteModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="favoriteList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 心得模态框 ============ -->
+<div class="modal-overlay" id="memoModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head">
+      <h3>💡 记心得</h3>
+      <button class="modal-close" onclick="closeModal('memoModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>关联配方</label>
+        <select id="m-recipe"><option value="">— 通用心得 —</option></select>
+      </div>
+      <div class="form-group">
+        <label>心得内容</label>
+        <textarea id="m-text" rows="4" placeholder="如：蛋糕表面易开裂，降低上火10℃..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>类型</label>
+        <select id="m-type">
+          <option value="温度">🌡️ 温度</option>
+          <option value="时间">⏱️ 时间</option>
+          <option value="手法">✋ 手法</option>
+          <option value="原料">🥚 原料</option>
+          <option value="其他">💡 其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('memoModal')">取消</button>
+      <button class="btn-save" onclick="saveMemo()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 制作计划模态框 ============ -->
+<div class="modal-overlay" id="planModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head">
+      <h3>📅 添加制作计划</h3>
+      <button class="modal-close" onclick="closeModal('planModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>计划日期</label>
+          <input type="date" id="pl-date">
+        </div>
+        <div class="form-group">
+          <label>配方</label>
+          <select id="pl-recipe"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>备注</label>
+        <input type="text" id="pl-note" placeholder="如：给生日聚会准备">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('planModal')">取消</button>
+      <button class="btn-save" onclick="savePlan()">添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 计时器模态框 ============ -->
+<div class="modal-overlay" id="timerModal">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-head">
+      <h3>⏱️ 烘焙计时器</h3>
+      <button class="modal-close" onclick="closeModal('timerModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:48px;font-weight:700;color:var(--pink-deep);font-family:var(--font-num);margin-bottom:16px" id="timerDisplay">00:00:00</div>
+        <div style="display:flex;gap:8px;justify-content:center;align-items:center">
+          <input type="number" id="timerMinutes" placeholder="分钟" min="0" max="999" style="width:80px;text-align:center">
+          <button class="tb-btn primary" onclick="startTimer()">开始</button>
+          <button class="tb-btn" onclick="stopTimer()">停止</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Toast 提示 ============ -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

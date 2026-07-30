@@ -1,0 +1,28 @@
+{
+  "name": "烘焙工作台 · Baking Workbench",
+  "short_name": "烘焙工作台",
+  "description": "数字化烘焙工作台，配方资料库 + 制作规划，适配森歌D5ZK集成灶",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5efe6",
+  "theme_color": "#c8842c",
+  "lang": "zh-CN",
+  "categories": ["food", "lifestyle", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "prefer_related_applications": false
+}
