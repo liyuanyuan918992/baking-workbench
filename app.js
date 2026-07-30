@@ -1572,13 +1572,13 @@ function saveRecipe() {
     const idx = state.recipes.findIndex(r => r.id === state.editingId);
     if (idx >= 0) {
       data.id = state.editingId;
-      data.emoji = state.recipes[idx].emoji || '🍽️';
+      data.emoji = state.recipes[idx].emoji || '🍰';
       state.recipes[idx] = data;
     }
     showToast('配方已更新 ✓');
   } else {
     data.id = 'r' + Date.now();
-    data.emoji = '🍽️';
+    data.emoji = '🍰';
     state.recipes.unshift(data);  // 新配方排在最上面
     showToast('配方已保存 ✓');
   }
@@ -1790,7 +1790,7 @@ function openFavoriteModal() {
   } else {
     list.innerHTML = favRecipes.map(r => `
       <div class="quick-memo" style="cursor:pointer" onclick="closeModal('favoriteModal');selectRecipe('${r.id}')">
-        <div style="font-weight:600">${r.emoji || '🍽️'} ${r.name} ${renderStars(r.rating || 0)}</div>
+        <div style="font-weight:600">${r.emoji || '🍰'} ${r.name} ${renderStars(r.rating || 0)}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${r.temp || '-'} · ${r.duration || '-'} · ${(r.tags || []).join(', ')}</div>
       </div>
     `).join('');
@@ -1841,7 +1841,7 @@ function renderPlansTab() {
         return `
           <div class="recipe-card" onclick="selectRecipe('${r.id}')">
             <div class="recipe-body">
-              <div class="recipe-name">${r.emoji || '🍽️'} ${r.name}</div>
+              <div class="recipe-name">${r.emoji || '🍰'} ${r.name}</div>
               <div class="recipe-stars" style="color:var(--pink-deep);font-weight:600">📅 ${p.date}</div>
               ${p.note ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:4px">${escapeHtml(p.note)}</div>` : ''}
               <button class="tb-btn" style="margin-top:8px;font-size:11px;padding:4px 10px" onclick="event.stopPropagation();removePlan('${p.id}')">✕ 删除计划</button>
