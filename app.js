@@ -457,18 +457,42 @@ function loadState() {
       state.customCats = data.customCats || [];
       state.fontSize = data.fontSize || 14;
       state.darkMode = data.darkMode || false;
-      if (state.recipes.length === 0) loadSamples();
+      // 不再自动加载示例配方：用户数据优先
     } catch (e) {
-      loadSamples();
+      // JSON 解析失败：保留空状态，不覆盖
+      console.warn('loadState parse error, keep empty state');
     }
   } else {
-    loadSamples();
+    // 检查旧版本 key（v2 兼容）
+    const LEGACY_KEYS = ['baking_workbench', 'baking_workbench_v2', 'baking-workbench-v1', 'baking_workbench_v1'];
+    for (var i = 0; i < LEGACY_KEYS.length; i++) {
+      var legacy = localStorage.getItem(LEGACY_KEYS[i]);
+      if (legacy) {
+        try {
+          var data = JSON.parse(legacy);
+          if (data.recipes && data.recipes.length > 0) {
+            // 迁移到新 key
+            state.recipes = data.recipes;
+            state.memos = data.memos || [];
+            state.plans = data.plans || [];
+            state.favorites = data.favorites || [];
+            state.stock = data.stock || {};
+            state.customCats = data.customCats || [];
+            saveState();  // 持久化到新 key
+            showToast('已迁移 ' + data.recipes.length + ' 个配方 ✓');
+            return;
+          }
+        } catch (e) {}
+      }
+    }
+    // 全新用户：空状态，不加载示例
   }
 }
 
 function loadSamples() {
-  // 示例数据：倒序排列，最新的（r8）显示在最上面
-  state.recipes = JSON.parse(JSON.stringify(SAMPLE_RECIPES)).reverse();
+  // 已废弃：不再自动加载示例配方
+  // 保留函数为了 resetData 兼容（如果用户主动重置）
+  state.recipes = [];
   state.memos = [];
   state.plans = [];
   state.favorites = [];
@@ -566,6 +590,11 @@ function switchMobileTab(tab) {
   document.querySelectorAll('.m-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.tab === tab);
   });
+  // 关键：切回配方 Tab 时重新渲染配方列表
+  if (tab === 'recipe') {
+    state.currentRecipeId = null;  // 退出详情页
+    renderContent();
+  }
   if (tab === 'plan') renderPlansTab();
   if (tab === 'memo') renderMemoTab();
 }
@@ -750,22 +779,97 @@ function openWebSearch() {
   showToast('已在新窗口打开下厨房搜索 ✓');
 }
 
-// ============ 详情页：换封面 ============
+// ============ 详情页：换封面（独立弹窗） ============
+let coverEditRecipeId = null;
+let coverTempEmoji = '';
+let coverTempPhoto = '';
+
 function openCoverChanger(recipeId) {
   var r = state.recipes.find(function(x) { return x.id === recipeId; });
   if (!r) return;
-  state.editingId = recipeId;
-  // 复用 openRecipeModal 但只滚动到 emoji 区域
-  openRecipeModal(recipeId);
-  // 高亮 emoji 网格区
-  setTimeout(function() {
-    var grid = document.getElementById('emojiGrid');
-    if (grid) {
-      grid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      grid.style.boxShadow = '0 0 0 3px var(--pink-primary)';
-      setTimeout(function() { grid.style.boxShadow = ''; }, 1500);
-    }
-  }, 200);
+  coverEditRecipeId = recipeId;
+  coverTempEmoji = r.emoji || '🍰';
+  coverTempPhoto = r.photo || '';
+  
+  // 渲染 emoji 网格
+  var grid = document.getElementById('coverEmojiGrid');
+  grid.innerHTML = RECIPE_EMOJIS.map(function(em) {
+    var sel = em === coverTempEmoji ? ' selected' : '';
+    return '<button type="button" class="emoji-btn' + sel + '" data-emoji="' + em + '" onclick="selectCoverEmoji(\'' + em + '\')">' + em + '</button>';
+  }).join('');
+  
+  // 渲染照片预览
+  var preview = document.getElementById('coverPhotoPreview');
+  if (coverTempPhoto) {
+    preview.style.backgroundImage = 'url(\'' + coverTempPhoto + '\')';
+    preview.classList.add('has-image');
+    preview.innerHTML = '<span class="remove-photo" onclick="event.stopPropagation();clearCoverPhoto()">×</span>';
+  } else {
+    preview.style.backgroundImage = '';
+    preview.classList.remove('has-image');
+    preview.innerHTML = '<span class="upload-hint">点击上传照片</span>';
+  }
+  
+  document.getElementById('coverModal').classList.add('show');
+}
+
+function selectCoverEmoji(em) {
+  coverTempEmoji = em;
+  coverTempPhoto = '';  // 选了 emoji 就清空照片
+  document.querySelectorAll('#coverEmojiGrid .emoji-btn').forEach(function(b) {
+    if (b.dataset.emoji === em) b.classList.add('selected');
+    else b.classList.remove('selected');
+  });
+  // 清空照片预览
+  var preview = document.getElementById('coverPhotoPreview');
+  preview.style.backgroundImage = '';
+  preview.classList.remove('has-image');
+  preview.innerHTML = '<span class="upload-hint">点击上传照片</span>';
+}
+
+function handleCoverPhotoUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 4 * 1024 * 1024) { showToast('图片过大，请压缩到 4MB 以内'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    coverTempPhoto = e.target.result;
+    coverTempEmoji = '';  // 上传照片就不需要 emoji
+    var preview = document.getElementById('coverPhotoPreview');
+    preview.style.backgroundImage = 'url(\'' + coverTempPhoto + '\')';
+    preview.classList.add('has-image');
+    preview.innerHTML = '<span class="remove-photo" onclick="event.stopPropagation();clearCoverPhoto()">×</span>';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearCoverPhoto() {
+  coverTempPhoto = '';
+  var preview = document.getElementById('coverPhotoPreview');
+  preview.style.backgroundImage = '';
+  preview.classList.remove('has-image');
+  preview.innerHTML = '<span class="upload-hint">点击上传照片</span>';
+  document.getElementById('cover-photo').value = '';
+  // 恢复 emoji 选中
+  if (!coverTempEmoji) coverTempEmoji = '🍰';
+  document.querySelectorAll('#coverEmojiGrid .emoji-btn').forEach(function(b) {
+    if (b.dataset.emoji === coverTempEmoji) b.classList.add('selected');
+    else b.classList.remove('selected');
+  });
+}
+
+function saveCover() {
+  var r = state.recipes.find(function(x) { return x.id === coverEditRecipeId; });
+  if (!r) return;
+  r.emoji = coverTempEmoji || '🍰';
+  r.photo = coverTempPhoto || '';
+  saveState();
+  closeModal('coverModal');
+  // 重新渲染详情页
+  if (state.currentRecipeId === r.id) renderDetail(r);
+  // 重新渲染列表
+  renderContent();
+  showToast('封面已更新 ✓');
 }
 
 function renderStars(rating) {
@@ -2006,6 +2110,29 @@ function resetData() {
   state.memos = [];
   state.stock = {};
   rebuildCategories();
+  state.recipes = [];
+  saveState();
+  render();
+  showToast('已重置全部数据');
+}
+
+// 清空示例配方（id 以 r 开头 + 数字 的配方）
+function clearSampleRecipes() {
+  var samples = state.recipes.filter(function(r) {
+    return /^r\d+$/.test(r.id);
+  });
+  if (samples.length === 0) {
+    showToast('没有示例配方可清空');
+    return;
+  }
+  if (!confirm('确认删除 ' + samples.length + ' 个示例配方？\n（你自己添加的配方不会被删除）')) return;
+  state.recipes = state.recipes.filter(function(r) {
+    return !/^r\d+$/.test(r.id);
+  });
+  saveState();
+  render();
+  showToast('已清空 ' + samples.length + ' 个示例配方 ✓');
+}
   loadSamples();
   state.currentRecipeId = null;
   state.currentCat = 'all';
