@@ -6,6 +6,150 @@
    + 数据导入导出 + 字体缩放 + 夜间模式
 ============================================ */
 
+// ============ 封面简图库 ============
+const RECIPE_EMOJIS = [
+  // 蛋糕类
+  '🎂', '🍰', '🍮', '🧁', '🥧', '🍩', '🥐', '🥮',
+  // 面包类
+  '🍞', '🥖', '🥯', '🫓', '🥪',
+  // 饼干甜点
+  '🍪', '🍫', '🍬', '🍭', '🍯',
+  // 水果相关
+  '🍓', '🍒', '🍑', '🍎', '🍋', '🍌', '🍇', '🍉',
+  // 饮品/茶
+  '🍵', '☕', '🥛', '🧋',
+  // 烘焙工具
+  '🥄', '🧈', '🧂', '🥚', '🌾'
+];
+
+function renderEmojiGrid(selected) {
+  const grid = document.getElementById('emojiGrid');
+  if (!grid) return;
+  grid.innerHTML = RECIPE_EMOJIS.map(function(em) {
+    var sel = em === selected ? ' selected' : '';
+    return '<button type="button" class="emoji-btn' + sel + '" data-emoji="' + em + '" onclick="selectEmoji(\'' + em + '\')">' + em + '</button>';
+  }).join('');
+}
+
+function selectEmoji(em) {
+  state.tempEmoji = em;
+  // 重新渲染高亮
+  document.querySelectorAll('.emoji-btn').forEach(function(b) {
+    if (b.dataset.emoji === em) b.classList.add('selected');
+    else b.classList.remove('selected');
+  });
+  // 如果有照片，不冲突；emoji 作为兜底缩略显示
+}
+
+// ============ 烘焙原料市价库（参考盒马/京东2024-2025零售均价，元/g 或 元/ml 或 元/个） ============
+// 单位统一为：元/g（元/克），蛋类/液体按 元/个、元/ml
+const INGREDIENT_PRICES = {
+  // 粉类
+  '高筋面粉': 0.018, '低筋面粉': 0.022, '中筋面粉': 0.015, '全麦面粉': 0.025,
+  '玉米淀粉': 0.020, '糯米粉': 0.018, '杏仁粉': 0.45, '可可粉': 0.35,
+  '抹茶粉': 1.2, '奶粉': 0.30, '芝士粉': 0.80, '面包粉': 0.020,
+  // 糖类
+  '白砂糖': 0.012, '细砂糖': 0.012, '糖粉': 0.018, '红糖': 0.020,
+  '糖浆': 0.025, '蜂蜜': 0.080, '麦芽糖': 0.030, '木糖醇': 0.080,
+  '代糖': 0.30,
+  // 油脂
+  '黄油': 0.10, '无盐黄油': 0.10, '盐黄油': 0.11, '玉米油': 0.030,
+  '橄榄油': 0.080, '色拉油': 0.020, '酥油': 0.030, '起酥油': 0.025,
+  '椰子油': 0.10, '淡奶油': 0.065, '奶油奶酪': 0.080, '马苏里拉芝士': 0.10,
+  '芝士': 0.10, '干酪': 0.15,
+  // 乳制品
+  '牛奶': 0.022, '全脂牛奶': 0.022, '脱脂牛奶': 0.020, '酸奶': 0.040,
+  '炼乳': 0.040, '乳酪': 0.080,
+  // 蛋类
+  '鸡蛋': 1.0, '蛋白': 0.50, '蛋黄': 0.60, '鸭蛋': 2.0, '鹌鹑蛋': 0.20,
+  // 酵母/膨松剂
+  '酵母': 0.20, '耐高糖酵母': 0.30, '泡打粉': 0.060, '苏打粉': 0.040,
+  '塔塔粉': 0.20, '吉利丁': 0.50, '吉利丁片': 0.50,
+  // 调味料
+  '盐': 0.005, '海盐': 0.040, '柠檬汁': 0.080, '白醋': 0.010,
+  '香草精': 0.50, '柠檬皮屑': 0.50,
+  // 巧克力/坚果
+  '巧克力': 0.12, '黑巧克力': 0.18, '白巧克力': 0.15, '可可脂': 0.30,
+  '核桃': 0.10, '杏仁': 0.12, '腰果': 0.18, '榛子': 0.20, '花生': 0.040,
+  '开心果': 0.50, '松子': 0.80, '瓜子仁': 0.10,
+  // 果干/水果
+  '蔓越莓干': 0.10, '葡萄干': 0.060, '红枣': 0.060, '桂圆': 0.10,
+  '草莓': 0.10, '蓝莓': 0.20, '香蕉': 0.020, '苹果': 0.020,
+  // 液体
+  '水': 0.0001, '温水': 0.0001, '凉水': 0.0001,
+  // 其它
+  '椰蓉': 0.10, '椰丝': 0.10, '奶粉/糖粉': 0.30,
+  '白芝麻': 0.080, '黑芝麻': 0.080, '肉松': 0.10, '香葱': 0.030,
+  '火腿': 0.080, '培根': 0.10, '豆沙': 0.040
+};
+
+// 单位换算比例（to 克 或 to 毫升）
+const UNIT_CONVERSION = {
+  'g': 1, '克': 1,
+  'ml': 1, '毫升': 1,
+  'kg': 1000, '千克': 1000,
+  'L': 1000, '升': 1000,
+  '个': null,    // 蛋类按个算
+  '只': null,
+  '颗': null,
+  '滴': 0.05,    // 1滴≈0.05ml
+  '片': null,    // 吉利丁片等按重量
+  '勺': 15,      // 1勺≈15g（汤匙）
+  '汤匙': 15,
+  '茶匙': 5,
+  '包': null,
+  '袋': null,
+  '盒': null,
+  '杯': 240,
+  '份': null,
+  '条': null,
+  '块': null,
+  '根': null,
+  '适量': 1, '少许': 1
+};
+
+function estimateCost(name, amount, unit) {
+  // 直接查表
+  var directPrice = INGREDIENT_PRICES[name];
+  if (!directPrice) {
+    // 模糊匹配：去掉 "无盐""低脂" 等修饰词
+    var stripped = name.replace(/(无盐|有盐|低脂|高脂|常温|新鲜|有机)/g, '');
+    for (var key in INGREDIENT_PRICES) {
+      if (name.indexOf(key) >= 0 || stripped === key || stripped.indexOf(key) >= 0) {
+        directPrice = INGREDIENT_PRICES[key];
+        break;
+      }
+    }
+  }
+  if (!directPrice) return 0;
+
+  // 单位换算
+  if (unit === '个' || unit === '只' || unit === '颗' || unit === '滴') {
+    return directPrice * amount;  // 蛋类/液体按个数
+  }
+  var gramPerUnit = UNIT_CONVERSION[unit];
+  if (!gramPerUnit) return directPrice * amount;  // 兜底
+  return directPrice * amount * gramPerUnit;
+}
+
+// 批量估算配料成本
+function autoFillCosts() {
+  var filled = 0;
+  var total = 0;
+  state.tempIngredients.forEach(function(ing, idx) {
+    if (ing.name && ing.amount) {
+      var cost = estimateCost(ing.name, parseFloat(ing.amount), ing.unit || 'g');
+      if (cost > 0) {
+        ing.cost = Math.round(cost * 100) / 100;  // 保留2位
+        filled++;
+        total += ing.cost;
+      }
+    }
+  });
+  renderIngRows();
+  return { filled: filled, total: Math.round(total * 100) / 100 };
+}
+
 // ============ 默认分类 ============
 const DEFAULT_CATEGORIES = {
   all:    { name: '全部配方', icon: '📋', custom: false },
@@ -279,6 +423,7 @@ let state = {
   mobileTab: 'recipe',
   tempPhoto: '',
   tempRating: 0,
+  tempEmoji: '',            // 表单中选中的 emoji 封面
   tempIngredients: [],    // 表单中的配料
   currentScale: 1,        // 当前详情页的倍率
   ingChecks: {},          // {recipeId: {ingName: bool}}
@@ -545,8 +690,7 @@ function renderList() {
       <div class="recipe-card" onclick="selectRecipe('${r.id}')">
         <div class="recipe-thumb ${r.photo ? 'has-photo' : ''}" style="${thumbBg}">
           <span class="cat-badge">${cat.icon} ${cat.name}</span>
-          ${r.photo ? '' : `<span>${r.emoji || '🍽️'}</span>`}
-          ${r.photo ? '' : '<span class="photo-placeholder">📷 待上传</span>'}
+          ${r.photo ? '' : `<span class="recipe-emoji-big">${r.emoji || '🍰'}</span>`}
         </div>
         <div class="recipe-body">
           <div class="recipe-name">${r.name}</div>
@@ -851,6 +995,7 @@ function renderIngRows() {
       <button class="del-row" onclick="delIngRow(${idx})">×</button>
     </div>
   `).join('');
+  updateCostSummary();
 }
 
 function addIngRow() {
@@ -880,6 +1025,40 @@ function delIngRow(idx) {
   state.tempIngredients.splice(idx, 1);
   if (state.tempIngredients.length === 0) addIngRow();
   renderIngRows();
+  updateCostSummary();
+}
+
+function onAutoFillCost() {
+  var result = autoFillCosts();
+  updateCostSummary();
+  if (result.filled === 0) {
+    showToast('未识别到原料，请检查名称');
+  } else {
+    showToast('已估算 ' + result.filled + ' 项 · 总成本约 ¥' + result.total + ' ✓');
+  }
+}
+
+function updateCostSummary() {
+  var el = document.getElementById('costSummary');
+  if (!el) return;
+  var total = 0;
+  var qtyInput = document.getElementById('f-outputQty');
+  var unitInput = document.getElementById('f-outputUnit');
+  var qty = parseInt(qtyInput ? qtyInput.value : 0) || 0;
+  state.tempIngredients.forEach(function(ing) {
+    total += parseFloat(ing.cost) || 0;
+  });
+  if (total === 0) {
+    el.innerHTML = '';
+    return;
+  }
+  var html = '<div class="cost-sum-row">💰 总成本 ¥' + total.toFixed(2);
+  if (qty > 0) {
+    var unit = unitInput ? unitInput.value : '';
+    html += ' · 单价 ¥' + (total / qty).toFixed(2) + '/' + (unit || '份');
+  }
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 // ============ 智能识别：粘贴文字自动拆分配料+步骤+注意事项+温度/时间/份量 ============
@@ -1271,6 +1450,7 @@ function openRecipeModal(recipeId) {
     state.editingId = recipeId;
     state.tempPhoto = r.photo || '';
     state.tempRating = r.rating || 0;
+    state.tempEmoji = r.emoji || '';
     state.tempIngredients = JSON.parse(JSON.stringify(r.ingredients || []));
     document.getElementById('recipeModalTitle').textContent = '编辑配方';
     document.getElementById('recipeSaveBtn').textContent = '保存';
@@ -1296,6 +1476,7 @@ function openRecipeModal(recipeId) {
     state.editingId = null;
     state.tempPhoto = '';
     state.tempRating = 0;
+    state.tempEmoji = '🍰';
     state.tempIngredients = [];
     document.getElementById('recipeModalTitle').textContent = '新建配方';
     document.getElementById('recipeSaveBtn').textContent = '保存';
@@ -1308,6 +1489,7 @@ function openRecipeModal(recipeId) {
   }
   updateStars();
   renderIngRows();
+  renderEmojiGrid(state.tempEmoji);
   document.getElementById('recipeModal').classList.add('show');
 }
 
@@ -1329,7 +1511,7 @@ function saveRecipe() {
   const data = {
     name: name,
     cat: document.getElementById('f-cat').value,
-    emoji: '',
+    emoji: state.tempEmoji || '🍰',
     photo: state.tempPhoto || '',
     rating: state.tempRating,
     temp: document.getElementById('f-temp').value.trim(),
@@ -1362,6 +1544,7 @@ function saveRecipe() {
   state.editingId = null;
   state.tempPhoto = '';
   state.tempRating = 0;
+  state.tempEmoji = '';
   state.tempIngredients = [];
   saveState();
   closeModal('recipeModal');

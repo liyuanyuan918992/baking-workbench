@@ -1745,3 +1745,91 @@ body.dark-mode .sp-section-title { color: var(--pink-primary); border-color: var
   border-radius: 10px;
 }
 body.dark-mode .smart-preview { background: #2a2024; }
+
+/* ============================================
+   v3.4 emoji 封面网格 + 大图显示
+============================================ */
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  padding: 10px;
+  background: linear-gradient(135deg, #fff0f5, #fff8fa);
+  border: 1.5px solid var(--pink-border);
+  border-radius: 12px;
+  margin-bottom: 4px;
+}
+@media (max-width: 480px) {
+  .emoji-grid { grid-template-columns: repeat(6, 1fr); }
+}
+.emoji-btn {
+  aspect-ratio: 1;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.emoji-btn:hover {
+  background: var(--pink-light);
+  border-color: var(--pink-primary);
+  transform: scale(1.1);
+}
+.emoji-btn.selected {
+  background: var(--pink-light);
+  border-color: var(--pink-deep);
+  box-shadow: 0 0 0 2px rgba(255, 122, 143, 0.2);
+}
+body.dark-mode .emoji-grid { background: #2a2024; }
+body.dark-mode .emoji-btn { background: #332830; }
+
+.recipe-emoji-big {
+  font-size: 64px;
+  filter: drop-shadow(0 4px 8px rgba(255, 122, 143, 0.15));
+}
+@media (max-width: 480px) {
+  .recipe-emoji-big { font-size: 48px; }
+}
+
+/* 自动估值按钮 */
+.cost-estimate-btn {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  background: var(--pink-light);
+  color: var(--pink-deep);
+  border: 1px solid var(--pink-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.cost-estimate-btn:hover {
+  background: var(--pink-primary);
+  color: #fff;
+  border-color: var(--pink-deep);
+}
+body.dark-mode .cost-estimate-btn { background: #3a2830; color: var(--pink-primary); }
+
+/* 成本汇总 */
+.cost-summary {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #fff0f5, #ffe8ef);
+  border: 1px solid var(--pink-border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--pink-deep);
+  font-weight: 600;
+}
+.cost-sum-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+body.dark-mode .cost-summary { background: #2a2024; border-color: var(--pink-border); }

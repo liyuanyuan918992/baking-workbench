@@ -149,20 +149,24 @@
         </div>
       </div>
       <div class="form-group">
-        <label>成品图（手机可拍照上传）</label>
-        <div class="upload-area">
+        <label>封面简图 <span class="label-hint">（选一个或上传照片）</span></label>
+        <div class="emoji-grid" id="emojiGrid"></div>
+        <div class="upload-area" style="margin-top:8px">
           <div class="upload-preview" id="photoPreview" onclick="document.getElementById('f-photo').click()">
-            <span class="upload-hint">点击<br>上传图片</span>
+            <span class="upload-hint">点击<br>上传照片</span>
             <span class="remove-photo" onclick="event.stopPropagation();clearPhoto()">×</span>
           </div>
           <input type="file" id="f-photo" accept="image/*" onchange="handlePhotoUpload(event)">
-          <div class="upload-btn-text">支持拍照或相册选择<br>图片随配方永久保存在本地</div>
+          <div class="upload-btn-text">或拍照上传你的成品图<br>图片随配方永久保存在本地</div>
         </div>
       </div>
       <div class="form-group">
-        <label>配料 <span class="label-hint">（名称 · 用量 · 该用量成本元）</span></label>
+        <label>配料 <span class="label-hint">（名称 · 用量 · 成本）</span>
+          <button type="button" class="cost-estimate-btn" onclick="onAutoFillCost()">💰 自动估算成本</button>
+        </label>
         <div class="ing-rows" id="ingRows"></div>
         <button class="add-row-btn" onclick="addIngRow()">+ 添加一行配料</button>
+        <div id="costSummary" class="cost-summary"></div>
       </div>
       <div class="form-group">
         <label>步骤 <span class="label-hint">（每行一条）</span></label>
