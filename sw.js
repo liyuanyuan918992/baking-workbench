@@ -1,7 +1,7 @@
 /* 烘焙工作台 Service Worker
    - 缓存资源实现离线访问
-   - 后台更新（cache-first 策略）*/
-const CACHE_NAME = 'baking-workbench-v11';
+   - 网络优先策略（确保用户拿到最新版）*/
+const CACHE_NAME = 'baking-workbench-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -29,19 +29,18 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// 网络优先：先尝试网络，失败才用缓存
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        // 只缓存同源资源
-        if (response.ok && new URL(event.request.url).origin === location.origin) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => cached);
+    fetch(event.request).then(response => {
+      if (response.ok && new URL(event.request.url).origin === location.origin) {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+      }
+      return response;
+    }).catch(() => {
+      return caches.match(event.request).then(cached => cached || new Response('离线模式'));
     })
   );
 });
