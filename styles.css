@@ -1652,3 +1652,96 @@ body.dark-mode .smart-preview .sp-item { background: #332830; }
 body.dark-mode .ai-info-box { background: #2a2230; border-color: #4a3a50; }
 body.dark-mode .ing-item .ing-actions button { background: #332830; }
 body.dark-mode .ing-add-btn { border-color: var(--pink-border); color: var(--pink-primary); }
+
+/* ============================================
+   v3.2 步骤样式优化 + 智能识别预览分段
+============================================ */
+
+/* 步骤行：去掉带圈数字，改用粉色短竖线 */
+.step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+  list-style: none;
+  position: relative;
+}
+.step-bar {
+  flex-shrink: 0;
+  width: 3px;
+  height: 18px;
+  background: linear-gradient(180deg, var(--pink-primary), var(--pink-deep));
+  border-radius: 2px;
+  margin-top: 3px;
+}
+.step-text {
+  flex: 1;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+/* 步骤小标题（如【蛋黄糊制作】） */
+.step-subtitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pink-deep);
+  padding: 10px 0 4px;
+  margin-top: 4px;
+  border-bottom: 1px dashed var(--pink-border);
+  list-style: none;
+}
+
+/* 智能识别预览分段 */
+.sp-section {
+  margin-bottom: 12px;
+}
+.sp-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pink-deep);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--pink-border);
+}
+
+/* 暗色模式 */
+body.dark-mode .step-bar { background: linear-gradient(180deg, var(--pink-primary), var(--pink-deep)); }
+body.dark-mode .step-subtitle { color: var(--pink-primary); border-color: var(--pink-border); }
+body.dark-mode .sp-section-title { color: var(--pink-primary); border-color: var(--pink-border); }
+
+/* ============================================
+   v3.2.1 智能识别模态框尺寸优化
+============================================ */
+#smartPasteModal .modal {
+  max-width: 560px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+#smartPasteModal .modal-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+#smartPasteText {
+  resize: vertical;
+  min-height: 140px;
+  max-height: 240px;
+  font-family: monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.smart-preview {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 80px;
+  max-height: 320px;
+  margin-top: 12px;
+  padding: 8px;
+  background: #fff8fa;
+  border: 1px solid var(--pink-border);
+  border-radius: 10px;
+}
+body.dark-mode .smart-preview { background: #2a2024; }

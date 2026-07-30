@@ -103,11 +103,9 @@
       <button class="modal-close" onclick="closeModal('recipeModal')">×</button>
     </div>
     <div class="modal-body">
-      <!-- 智能识别 / AI生成 工具条 -->
+      <!-- 智能识别工具条 -->
       <div class="smart-toolbar">
-        <button class="smart-btn" onclick="openSmartPasteModal('ingredients')">📋 智能识别配料</button>
-        <button class="smart-btn" onclick="openSmartPasteModal('steps')">📋 智能识别步骤</button>
-        <button class="smart-btn ai" onclick="openAIGenModal()">🤖 AI 生成配方</button>
+        <button class="smart-btn" onclick="openSmartPasteModal()">📋 智能识别（配料+步骤）</button>
       </div>
 
       <div class="form-group">
@@ -175,8 +173,8 @@
         <textarea id="f-oven" rows="2" placeholder="如：原配方上火180/下火160，平炉取170℃，底层加烤盘隔热防糊底"></textarea>
       </div>
       <div class="form-group">
-        <label>制作难点 / 心得</label>
-        <textarea id="f-difficulty" rows="3" placeholder="如：蛋白打发至湿性偏干，切勿打过头"></textarea>
+        <label>注意事项</label>
+        <textarea id="f-difficulty" rows="3" placeholder="如：蛋白打发至湿性偏干，切勿打过头；烤箱需预热到位"></textarea>
       </div>
       <div class="form-group">
         <label>标签（逗号分隔）</label>
@@ -331,75 +329,36 @@
 
 <!-- ============ 智能识别模态框 ============ -->
 <div class="modal-overlay" id="smartPasteModal">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:520px">
     <div class="modal-head">
-      <h3 id="smartPasteTitle">📋 智能识别</h3>
+      <h3>📋 智能识别</h3>
       <button class="modal-close" onclick="closeModal('smartPasteModal')">×</button>
     </div>
     <div class="modal-body">
-      <p id="smartPasteHint" style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">
-        粘贴文字，自动拆分配料表或步骤段落。<br>
-        支持格式：<code>高筋面粉 250g</code> / <code>牛奶 120克</code> / <code>黄油25g</code>
+      <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">
+        粘贴文字，自动拆分配料和步骤。<br>
+        支持格式：<code>高筋面粉 250g</code> · <code>牛奶120克</code> · <code>1. 揉面至扩展</code>
       </p>
       <div class="form-group">
         <label>粘贴文字</label>
-        <textarea id="smartPasteText" rows="8" placeholder="在这里粘贴配料表或步骤文字...&#10;&#10;示例1（配料）：&#10;高筋面粉 250g&#10;牛奶 120g&#10;黄油 25g&#10;酵母 3g&#10;&#10;示例2（步骤）：&#10;1. 所有材料入揉面桶搅拌成团&#10;2. 加入黄油揉至扩展阶段&#10;3. 发酵60分钟至2倍大"></textarea>
+        <textarea id="smartPasteText" rows="9" placeholder="在这里粘贴配方文字...
+
+示例：
+高筋面粉 250g
+牛奶 120g
+黄油 25g
+酵母 3g
+盐 3g
+
+1. 所有材料入揉面桶搅拌成团
+2. 加入黄油揉至扩展阶段
+3. 发酵60分钟至2倍大"></textarea>
       </div>
       <div id="smartPastePreview" class="smart-preview"></div>
     </div>
     <div class="modal-foot">
       <button class="btn-cancel" onclick="closeModal('smartPasteModal')">取消</button>
       <button class="btn-save" onclick="applySmartPaste()">识别并填入</button>
-    </div>
-  </div>
-</div>
-
-<!-- ============ AI 生成配方模态框 ============ -->
-<div class="modal-overlay" id="aiGenModal">
-  <div class="modal" style="max-width:520px">
-    <div class="modal-head">
-      <h3>🤖 AI 生成配方</h3>
-      <button class="modal-close" onclick="closeModal('aiGenModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="ai-info-box">
-        <div style="font-weight:600;margin-bottom:6px">💡 使用说明</div>
-        <div style="font-size:12px;line-height:1.7;color:var(--text-secondary)">
-          1. 注册<a href="https://bailian.console.aliyun.com/" target="_blank" style="color:var(--pink-deep)">阿里云百炼</a>，获取 API Key（有免费额度）<br>
-          2. 在下方填入 Key，仅保存在你手机本地，不会上传<br>
-          3. 上传视频截图或图片，AI 自动识别生成完整配方<br>
-          4. 也可直接粘贴抖音文案/字幕让 AI 整理
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>通义千问 API Key <span class="label-hint">（仅存本地）</span></label>
-        <div style="display:flex;gap:8px">
-          <input type="password" id="aiApiKey" placeholder="sk-xxxxxxxx" style="flex:1">
-          <button class="tb-btn" onclick="saveAIKey()">保存</button>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>上传视频截图 / 配料表图片 / 抖音文案</label>
-        <div class="upload-area">
-          <div class="upload-preview" id="aiPhotoPreview" onclick="document.getElementById('ai-photo').click()" style="width:100%;height:120px">
-            <span class="upload-hint">点击上传图片<br>（视频关键画面截图）</span>
-          </div>
-          <input type="file" id="ai-photo" accept="image/*" onchange="handleAIPhotoUpload(event)" style="display:none">
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>或粘贴文案/字幕文字</label>
-        <textarea id="aiText" rows="4" placeholder="粘贴抖音视频文案、字幕、或你想要生成的配方描述...&#10;如：做一个抹茶戚风蛋糕，6寸模具，用森歌D5ZK平炉烘烤"></textarea>
-      </div>
-
-      <div id="aiStatus" style="font-size:12px;color:var(--text-muted);min-height:18px;margin-bottom:8px"></div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn-cancel" onclick="closeModal('aiGenModal')">取消</button>
-      <button class="btn-save" onclick="generateRecipeByAI()" id="aiGenBtn">🤖 生成配方</button>
     </div>
   </div>
 </div>
