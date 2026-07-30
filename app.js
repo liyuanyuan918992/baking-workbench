@@ -467,7 +467,8 @@ function loadState() {
 }
 
 function loadSamples() {
-  state.recipes = JSON.parse(JSON.stringify(SAMPLE_RECIPES));
+  // 示例数据：倒序排列，最新的（r8）显示在最上面
+  state.recipes = JSON.parse(JSON.stringify(SAMPLE_RECIPES)).reverse();
   state.memos = [];
   state.plans = [];
   state.favorites = [];
@@ -673,13 +674,16 @@ function renderList() {
       ${state.searchKeyword ? `<span class="filter-clear" onclick="clearSearch()">清空筛选</span>` : ''}
     </div>` : '';
 
-  // 原料反查条
+  // 工具条：原料反查 + 网络搜索（紧凑布局）
   const recheckBar = `
     <div class="recheck-bar">
-      <span class="recheck-label">原料反查：</span>
-      <input type="text" id="recheckInput" placeholder="输入原料名，如 低筋面粉 / 黄油">
-      <button class="mini-btn" onclick="recheckByIng()">🔍 查询</button>
-      <button class="mini-btn" onclick="document.getElementById('recheckInput').value=''">清除</button>
+      <button class="mini-btn" onclick="toggleRecheck()">🔍 原料反查</button>
+      <button class="mini-btn web" onclick="openWebSearch()">🌐 网络搜索</button>
+      <div id="recheckPanel" style="display:none;margin-top:8px">
+        <input type="text" id="recheckInput" placeholder="输入原料名，如 低筋面粉 / 黄油">
+        <button class="mini-btn" onclick="recheckByIng()">查询</button>
+        <button class="mini-btn" onclick="document.getElementById('recheckInput').value='';document.getElementById('recheckPanel').style.display='none'">关闭</button>
+      </div>
     </div>`;
 
   const cards = recipes.map(r => {
@@ -731,6 +735,39 @@ function recheckByIng() {
   renderContent();
 }
 
+function toggleRecheck() {
+  var p = document.getElementById('recheckPanel');
+  p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+}
+
+function openWebSearch() {
+  // 弹出简易搜索框
+  var q = prompt('输入要搜索的烘焙配方，如：\n• 巴斯克芝士蛋糕\n• 蔓越莓饼干\n• 全麦吐司');
+  if (!q) return;
+  // 跳转下厨房站内搜索
+  var url = 'https://so.xiachufang.com/?keyword=' + encodeURIComponent(q);
+  window.open(url, '_blank', 'noopener');
+  showToast('已在新窗口打开下厨房搜索 ✓');
+}
+
+// ============ 详情页：换封面 ============
+function openCoverChanger(recipeId) {
+  var r = state.recipes.find(function(x) { return x.id === recipeId; });
+  if (!r) return;
+  state.editingId = recipeId;
+  // 复用 openRecipeModal 但只滚动到 emoji 区域
+  openRecipeModal(recipeId);
+  // 高亮 emoji 网格区
+  setTimeout(function() {
+    var grid = document.getElementById('emojiGrid');
+    if (grid) {
+      grid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      grid.style.boxShadow = '0 0 0 3px var(--pink-primary)';
+      setTimeout(function() { grid.style.boxShadow = ''; }, 1500);
+    }
+  }, 200);
+}
+
 function renderStars(rating) {
   let html = '';
   for (let i = 1; i <= 5; i++) {
@@ -746,9 +783,15 @@ function renderDetail(recipe) {
   const scale = state.currentScale || 1;
   const ingChecks = state.ingChecks[recipe.id] || {};
 
-  const photoSection = recipe.photo
-    ? `<div class="detail-photo-section"><img class="detail-photo" src="${recipe.photo}" alt="成品图"></div>`
-    : `<div class="detail-photo-section"><div class="detail-photo-empty"><div class="icon">📷</div><div>暂无成品图，点击「编辑」上传</div></div></div>`;
+  const photoSection = `
+    <div class="detail-photo-section">
+      ${recipe.photo
+        ? `<img class="detail-photo" src="${recipe.photo}" alt="成品图">`
+        : `<div class="detail-photo-empty emoji-fallback"><div class="recipe-emoji-big">${recipe.emoji || '🍰'}</div><div class="emoji-hint">点击 ✏️ 更换封面图</div></div>`}
+      <div class="cover-actions">
+        <button class="cover-btn" onclick="event.stopPropagation();openCoverChanger('${recipe.id}')" title="更换封面">✏️ 换封面</button>
+      </div>
+    </div>`;
 
   const ingItems = (recipe.ingredients || []).map((i, idx) => {
     const checked = ingChecks[i.name] || false;
@@ -1536,7 +1579,7 @@ function saveRecipe() {
   } else {
     data.id = 'r' + Date.now();
     data.emoji = '🍽️';
-    state.recipes.push(data);
+    state.recipes.unshift(data);  // 新配方排在最上面
     showToast('配方已保存 ✓');
   }
 
@@ -1550,9 +1593,8 @@ function saveRecipe() {
   closeModal('recipeModal');
   render();
   if (wasNew) {
-    // 新建后跳到详情
-    const last = state.recipes[state.recipes.length - 1];
-    selectRecipe(last.id);
+    // 新建后跳到详情（unshift后第 0 个就是新配方）
+    selectRecipe(state.recipes[0].id);
   }
 }
 
@@ -1562,7 +1604,7 @@ function duplicateRecipe(id) {
   const copy = JSON.parse(JSON.stringify(r));
   copy.id = 'r' + Date.now();
   copy.name = r.name + '（副本）';
-  state.recipes.push(copy);
+  state.recipes.unshift(copy);  // 副本也排到最上面
   saveState();
   render();
   showToast('已复制配方 ✓');
